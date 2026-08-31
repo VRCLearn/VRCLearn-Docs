@@ -1,0 +1,27 @@
+{
+  "name": "vrclearn-docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/generate-docs.mjs",
+    "prebuild": "node scripts/generate-docs.mjs && node scripts/generate-sitemap.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans": "^5.2.10",
+    "@fontsource/noto-sans-mono": "^5.2.10",
+    "@fontsource/noto-sans-sc": "^5.2.9",
+    "@material/material-color-utilities": "^0.4.0",
+    "@material/web": "^2.4.1",
+    "markdown-it": "^14.1.0",
+    "material-symbols": "^0.44.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

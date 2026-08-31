@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="{{VRCL_SITE_NAME}}" />
+    <meta name="description" content="{{VRCL_SITE_DESCRIPTION}}" />
+    <meta property="og:site_name" content="{{VRCL_SITE_NAME}}" />
+    <meta property="og:title" content="{{VRCL_SITE_TITLE}}" />
+    <meta property="og:description" content="{{VRCL_SITE_SOCIAL_DESCRIPTION}}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="{{VRCL_CANONICAL_URL}}" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{{VRCL_SITE_TITLE}}</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{VRCL_ANALYTICS_ID}}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+
+        function gtag() {
+            dataLayer.push(arguments);
+        }
+
+        gtag('js', new Date());
+        gtag('config', '{{VRCL_ANALYTICS_ID}}');
+    </script>
+    <script>
+        const rootElement = document.documentElement;
+        rootElement.classList.add('js', 'fonts-loading');
+        window.__finishAppLoading = () => {
+            rootElement.classList.remove('fonts-loading');
+            rootElement.classList.add('fonts-loaded');
+            window.__fontsLoadedFallbackTimeoutId = null;
+        };
+
+        const themeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const updateTheme = () => {
+            rootElement.classList.toggle('dark', themeQuery.matches);
+            rootElement.classList.toggle('light', !themeQuery.matches);
+        };
+        updateTheme();
+        themeQuery.addEventListener('change', updateTheme);
+
+        window.__fontsLoadedFallbackTimeoutId = window.setTimeout(window.__finishAppLoading, 3600);
+    </script>
+    <link rel="stylesheet" href="/theme/light.css" />
+    <link rel="stylesheet" href="/theme/dark.css" media="(prefers-color-scheme: dark)" />
+    <link rel="stylesheet" href="/src/styles/loading.css" />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+    <script type="module" src="/src/main.jsx"></script>
+</head>
+<body>
+<div class="app-loading" aria-live="polite" aria-label="页面资源加载中">
+    <img class="app-loading__logo" src="/favicon.svg" alt="" aria-hidden="true" />
+    <div class="app-loading__bar" aria-hidden="true">
+        <span class="app-loading__indicator"></span>
+    </div>
+</div>
+<div id="root"></div>
+</body>
+</html>

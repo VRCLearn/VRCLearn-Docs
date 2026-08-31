@@ -1,0 +1,88 @@
+:root {
+    --app-content-padding: 32px;
+    --app-loading-logo-size: 96px;
+    --app-loading-logo-enter-offset: 10px;
+    --app-loading-logo-enter-scale: 0.96;
+    --app-loading-logo-enter-duration: 0.6s;
+    --app-loading-content-gap: 32px;
+    --app-loading-bar-width: 220px;
+    --app-loading-bar-height: 4px;
+    --app-loading-bar-track-color: var(--md-sys-color-surface-container-highest);
+    --app-loading-bar-indicator-color: var(--md-sys-color-primary);
+    --app-loading-bar-motion-duration: 1.2s;
+    --app-loading-exit-duration: 0.18s;
+    --app-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+    --app-shape-corner-full: 9999px;
+}
+
+html.fonts-loaded:not(.fonts-loading) .app-loading {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+html.fonts-loading .app-header,
+html.fonts-loading .app-layout,
+html.fonts-loading .theme-panel {
+    visibility: hidden;
+}
+
+.app-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-loading-content-gap);
+    background: var(--md-sys-color-surface);
+    opacity: 1;
+    transition: opacity var(--app-loading-exit-duration) var(--app-motion-easing-standard), visibility 0s linear var(--app-loading-exit-duration);
+}
+
+.app-loading__logo {
+    width: var(--app-loading-logo-size);
+    height: var(--app-loading-logo-size);
+    object-fit: contain;
+    transform: translateY(var(--app-loading-logo-enter-offset)) scale(var(--app-loading-logo-enter-scale));
+    opacity: 0;
+    animation: app-loading-logo-enter var(--app-loading-logo-enter-duration) var(--app-motion-easing-standard) forwards;
+}
+
+.app-loading__bar {
+    position: relative;
+    width: min(var(--app-loading-bar-width), calc(100vw - (var(--app-content-padding) * 2)));
+    height: var(--app-loading-bar-height);
+    overflow: hidden;
+    border-radius: var(--app-shape-corner-full);
+    background: var(--app-loading-bar-track-color);
+}
+
+.app-loading__indicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 42%;
+    border-radius: inherit;
+    background: var(--app-loading-bar-indicator-color);
+    animation: app-loading-bar var(--app-loading-bar-motion-duration) var(--app-motion-easing-standard) infinite;
+}
+
+@keyframes app-loading-bar {
+    0% {
+        transform: translateX(-120%);
+    }
+
+    100% {
+        transform: translateX(260%);
+    }
+}
+
+@keyframes app-loading-logo-enter {
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}

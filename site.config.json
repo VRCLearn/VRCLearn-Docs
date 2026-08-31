@@ -1,0 +1,22 @@
+{
+    "productName": "VRCLearn",
+    "siteName": "VRCLearn Docs",
+    "homepageUrl": "https://docs.vrclearn.com/",
+    "googleAnalyticsMeasurementId": "G-C21Q20Z7EX",
+    "repository": "VRCLearn/VRCLearn-Docs",
+    "siteMetadata": {
+        "title": "VRCLearn Docs | VRChat 文档中心",
+        "description": "VRCLearn 文档中心，包含 Avatar、World 教程与 ALCOMD 文档。",
+        "socialDescription": "汇集 VRChat Avatar、World 与 ALCOMD 的文档。"
+    },
+    "sites": {
+        "www": {
+            "name": "VRCLearn",
+            "homepageUrl": "https://www.vrclearn.com/"
+        },
+        "alcomd": {
+            "name": "ALCOMD",
+            "homepageUrl": "https://alcomd.vrclearn.com/"
+        }
+    }
+}
