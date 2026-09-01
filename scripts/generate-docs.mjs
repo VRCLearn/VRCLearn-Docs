@@ -6,11 +6,12 @@ import {fileURLToPath} from 'node:url';
 import siteConfig from '../site.config.json' with {type: 'json'};
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const docsSourceRoot = path.join(projectRoot, 'content');
 const outputRoot = path.join(projectRoot, 'public', 'docs-content');
 const generatedDataPath = path.join(projectRoot, 'src', 'generated', 'docs-data.js');
 const VRCLEARN_MAIN_SITE = siteConfig.sites.www;
 
-const DOCS_TYPES = ['avatar', 'world'];
+const DOCS_COLLECTIONS = siteConfig.docs.collections;
 const MAX_DOC_TITLE_LENGTH = 200;
 const DOCS_HOME_SLUG = '_home';
 
@@ -56,23 +57,33 @@ function normalizeDocsSlug(rawSlug) {
     return pathWithoutMarkdownExtension;
 }
 
-function normalizeDocsType(rawDocsType) {
-    const value = String(rawDocsType || '').trim().toLowerCase();
-    return DOCS_TYPES.includes(value) ? value : null;
+function normalizeDocsAudience(rawAudience) {
+    const value = String(rawAudience || '').trim().toLowerCase();
+    return DOCS_COLLECTIONS.some((collection) => collection.audience === value) ? value : null;
 }
 
-function buildDocsPath({docsType, lang, slug}) {
-    const normalizedDocsType = normalizeDocsType(docsType);
+function normalizeDocsTopic(rawTopic, audience) {
+    const normalizedAudience = normalizeDocsAudience(audience);
+    const value = String(rawTopic || '').trim().toLowerCase();
+    return DOCS_COLLECTIONS.some((collection) => (
+        collection.audience === normalizedAudience && collection.topic === value
+    )) ? value : null;
+}
+
+function buildDocsPath({audience, topic, lang, slug}) {
+    const normalizedAudience = normalizeDocsAudience(audience);
+    const normalizedTopic = normalizeDocsTopic(topic, normalizedAudience);
     const normalizedLang = normalizeLang(lang);
     const normalizedSlug = normalizeDocsSlug(slug);
-    if (!normalizedDocsType) {
+    if (!normalizedAudience || !normalizedTopic) {
         return '/';
     }
+    const docsHomePath = `/${normalizedLang}/${normalizedAudience}/${normalizedTopic}`;
     if (!normalizedSlug) {
-        return `/${normalizedDocsType}/${normalizedLang}`;
+        return docsHomePath;
     }
 
-    return `/${normalizedDocsType}/${normalizedLang}/${encodeURI(normalizedSlug)}`;
+    return `${docsHomePath}/${encodeURI(normalizedSlug)}`;
 }
 
 function ensureCleanOutput() {
@@ -245,29 +256,45 @@ function hasNonMarkdownExtension(pathname) {
     return extensionMatch[1].toLowerCase() !== 'md';
 }
 
-function buildDocsRoutePath(pathname, fallbackDocsType, fallbackLang) {
+function buildDocsRoutePath(pathname, fallbackAudience, fallbackTopic, fallbackLang) {
     const normalizedPath = String(pathname || '').replace(/\\/g, '/');
 
-    const docsContentMatch = normalizedPath.match(/^\/docs-content\/(avatar|world)\/([^/]+)(?:\/(.*))?$/i);
+    const docsContentMatch = normalizedPath.match(/^\/docs-content\/([^/]+)\/([^/]+)\/([^/]+)(?:\/(.*))?$/i);
     if (docsContentMatch) {
-        const docsType = normalizeDocsType(docsContentMatch[1] || fallbackDocsType);
-        const lang = normalizeLang(docsContentMatch[2] || fallbackLang);
-        const markdownPart = docsContentMatch[3] || 'index.md';
+        const audience = normalizeDocsAudience(docsContentMatch[1] || fallbackAudience);
+        const topic = normalizeDocsTopic(docsContentMatch[2] || fallbackTopic, audience);
+        const lang = normalizeLang(docsContentMatch[3] || fallbackLang);
+        const markdownPart = docsContentMatch[4] || 'index.md';
         if (hasNonMarkdownExtension(markdownPart)) {
             return null;
         }
-        return buildDocsPath({docsType, lang, slug: markdownPart.replace(/\.md$/i, '')});
+        return buildDocsPath({audience, topic, lang, slug: markdownPart.replace(/\.md$/i, '')});
     }
 
-    const sourceDocsMatch = normalizedPath.match(/^\/(avatar|world)\/([^/]+)(?:\/(.*))?$/i);
+    const sourceDocsMatch = normalizedPath.match(/^\/([^/]+)\/([^/]+)\/([^/]+)(?:\/(.*))?$/i);
     if (sourceDocsMatch) {
-        const docsType = normalizeDocsType(sourceDocsMatch[1] || fallbackDocsType);
-        const lang = normalizeLang(sourceDocsMatch[2] || fallbackLang);
-        const pathPart = sourceDocsMatch[3] || '';
-        if (hasNonMarkdownExtension(pathPart)) {
+        const audience = normalizeDocsAudience(sourceDocsMatch[1] || fallbackAudience);
+        const topic = normalizeDocsTopic(sourceDocsMatch[2] || fallbackTopic, audience);
+        const lang = normalizeLang(sourceDocsMatch[3] || fallbackLang);
+        const pathPart = sourceDocsMatch[4] || '';
+        if (audience && topic) {
+            if (hasNonMarkdownExtension(pathPart)) {
+                return null;
+            }
+            return buildDocsPath({audience, topic, lang, slug: pathPart.replace(/\.md$/i, '')});
+        }
+    }
+
+    const publicDocsMatch = normalizedPath.match(/^\/([^/]+)\/([^/]+)\/([^/]+)(?:\/(.*))?$/i);
+    if (publicDocsMatch) {
+        const lang = normalizeLang(publicDocsMatch[1] || fallbackLang);
+        const audience = normalizeDocsAudience(publicDocsMatch[2] || fallbackAudience);
+        const topic = normalizeDocsTopic(publicDocsMatch[3] || fallbackTopic, audience);
+        const pathPart = publicDocsMatch[4] || '';
+        if (!audience || !topic || hasNonMarkdownExtension(pathPart)) {
             return null;
         }
-        return buildDocsPath({docsType, lang, slug: pathPart.replace(/\.md$/i, '')});
+        return buildDocsPath({audience, topic, lang, slug: pathPart.replace(/\.md$/i, '')});
     }
 
     return null;
@@ -283,7 +310,8 @@ function normalizeMarkdownDocHref(rawHref, env = {}) {
     }
 
     const sourceDocsPath = normalizeSourceDocsPath(env.docsSourcePath);
-    const fallbackDocsType = normalizeDocsType(env.docsType);
+    const fallbackAudience = normalizeDocsAudience(env.docsAudience);
+    const fallbackTopic = normalizeDocsTopic(env.docsTopic, fallbackAudience);
     const fallbackLang = normalizeLang(env.docsLang);
 
     try {
@@ -293,7 +321,12 @@ function normalizeMarkdownDocHref(rawHref, env = {}) {
                 ? new URL(href, new URL(sourceDocsPath, 'https://docs.local/'))
                 : new URL(href, 'https://site.local/'));
 
-        const docsRoutePath = buildDocsRoutePath(resolvedUrl.pathname, fallbackDocsType, fallbackLang);
+        const docsRoutePath = buildDocsRoutePath(
+            resolvedUrl.pathname,
+            fallbackAudience,
+            fallbackTopic,
+            fallbackLang
+        );
         if (docsRoutePath) {
             return `${docsRoutePath}${resolvedUrl.search}${resolvedUrl.hash}`;
         }
@@ -342,7 +375,9 @@ function normalizeMarkdownImageSrc(rawSrc, env = {}) {
             return `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
         }
 
-        if (/^\/(?:avatar|world)\//i.test(resolvedUrl.pathname)) {
+        const sourcePathMatch = resolvedUrl.pathname.match(/^\/([^/]+)\/([^/]+)\//);
+        const sourceAudience = normalizeDocsAudience(sourcePathMatch?.[1]);
+        if (sourceAudience && normalizeDocsTopic(sourcePathMatch?.[2], sourceAudience)) {
             return `/docs-content${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
         }
 
@@ -597,15 +632,16 @@ function renderMarkdownPage(markdownText, entry) {
     return {
         title: title || entry.title,
         html: markdown.render(body, {
-            docsType: entry.docsType,
+            docsAudience: entry.audience,
+            docsTopic: entry.topic,
             docsLang: entry.lang,
-            docsSourcePath: entry.path
+            docsSourcePath: `${entry.audience}/${entry.topic}/${entry.lang}/${entry.slug}.md`
         })
     };
 }
 
-function getDocsScopeKey(docsType, lang) {
-    return `${docsType}:${lang}`;
+function getDocsScopeKey(audience, topic, lang) {
+    return `${audience}:${topic}:${lang}`;
 }
 
 function applyMarkdownH1Titles(indexEntries, sourceRepoRoot) {
@@ -626,7 +662,7 @@ function applyMarkdownH1Titles(indexEntries, sourceRepoRoot) {
 function collectDirectoryIndexMeta(docsSources) {
     const meta = new Map();
 
-    for (const {docsType, lang, langRoot} of docsSources) {
+    for (const {audience, topic, lang, langRoot} of docsSources) {
         if (!fs.existsSync(langRoot)) {
             continue;
         }
@@ -654,15 +690,16 @@ function collectDirectoryIndexMeta(docsSources) {
             }
 
             if (relDir.split('/').filter(Boolean).length > 1) {
-                console.warn(`[generate-docs][warn] 已忽略非规范目录索引：${docsType}/${lang}/${relDir}/index.md。目录排序只支持语言根目录和一级分组目录。`);
+                console.warn(`[generate-docs][warn] 已忽略非规范目录索引：${audience}/${topic}/${lang}/${relDir}/index.md。目录排序只支持语言根目录和一级分组目录。`);
                 continue;
             }
 
             const markdownText = fs.readFileSync(indexPath, 'utf8');
             const title = extractFirstMarkdownH1(markdownText);
             const orderSequence = extractMarkdownH2Sequence(markdownText);
-            meta.set(`${docsType}:${lang}:${relDir}`, {
-                docsType,
+            meta.set(`${audience}:${topic}:${lang}:${relDir}`, {
+                audience,
+                topic,
                 lang,
                 dirPath: relDir,
                 title,
@@ -678,7 +715,7 @@ function applyGroupTitlesFromDirectoryIndexMeta(indexEntries, directoryIndexMeta
     const scopeGroupTitles = new Map();
 
     for (const value of directoryIndexMeta.values()) {
-        const scopeKey = getDocsScopeKey(value.docsType, value.lang);
+        const scopeKey = getDocsScopeKey(value.audience, value.topic, value.lang);
         const groupPath = value.dirPath;
         if (!groupPath || !value?.title) {
             continue;
@@ -691,7 +728,7 @@ function applyGroupTitlesFromDirectoryIndexMeta(indexEntries, directoryIndexMeta
     }
 
     for (const entry of indexEntries) {
-        const autoGroupTitles = scopeGroupTitles.get(getDocsScopeKey(entry.docsType, entry.lang));
+        const autoGroupTitles = scopeGroupTitles.get(getDocsScopeKey(entry.audience, entry.topic, entry.lang));
         if (!autoGroupTitles) {
             continue;
         }
@@ -705,7 +742,7 @@ function applyGroupTitlesFromDirectoryIndexMeta(indexEntries, directoryIndexMeta
 function applyOrderFromDirectoryIndexMeta(indexEntries, directoryIndexMeta) {
     const docsByScope = new Map();
     for (const entry of indexEntries) {
-        const scopeKey = getDocsScopeKey(entry.docsType, entry.lang);
+        const scopeKey = getDocsScopeKey(entry.audience, entry.topic, entry.lang);
         if (!docsByScope.has(scopeKey)) {
             docsByScope.set(scopeKey, []);
         }
@@ -715,10 +752,10 @@ function applyOrderFromDirectoryIndexMeta(indexEntries, directoryIndexMeta) {
     }
 
     for (const [scopeKey, docs] of docsByScope.entries()) {
-        const [docsType, lang] = scopeKey.split(':');
+        const [audience, topic, lang] = scopeKey.split(':');
         const groupTitleMap = new Map();
         for (const value of directoryIndexMeta.values()) {
-            if (value.docsType !== docsType || value.lang !== lang) {
+            if (value.audience !== audience || value.topic !== topic || value.lang !== lang) {
                 continue;
             }
             const groupPath = value.dirPath;
@@ -729,7 +766,7 @@ function applyOrderFromDirectoryIndexMeta(indexEntries, directoryIndexMeta) {
         }
 
         for (const value of directoryIndexMeta.values()) {
-            if (value.docsType !== docsType || value.lang !== lang) {
+            if (value.audience !== audience || value.topic !== topic || value.lang !== lang) {
                 continue;
             }
             const dirPath = value.dirPath;
@@ -740,7 +777,9 @@ function applyOrderFromDirectoryIndexMeta(indexEntries, directoryIndexMeta) {
 
             const directDocs = [];
             const directGroups = new Map();
-            const scopeLabel = dirPath ? `${docsType}/${lang}/${dirPath}` : `${docsType}/${lang}/(root)`;
+            const scopeLabel = dirPath
+                ? `${audience}/${topic}/${lang}/${dirPath}`
+                : `${audience}/${topic}/${lang}/(root)`;
             for (const doc of docs) {
                 const parts = doc.slug.split('/').filter(Boolean);
                 const docDir = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
@@ -861,7 +900,7 @@ function applyOrderFromDirectoryIndexMeta(indexEntries, directoryIndexMeta) {
 function collectMarkdownEntries(docsSources) {
     const entries = [];
 
-    for (const {docsType, lang, langRoot} of docsSources) {
+    for (const {audience, topic, lang, langRoot} of docsSources) {
         if (!fs.existsSync(langRoot)) {
             continue;
         }
@@ -884,16 +923,17 @@ function collectMarkdownEntries(docsSources) {
                 const slug = rel.replace(/\.md$/i, '');
                 const unsupportedReason = getUnsupportedMarkdownPathReason(slug);
                 if (unsupportedReason) {
-                    console.warn(`[generate-docs][warn] 已忽略非规范文档路径：${docsType}/${lang}/${rel}。${unsupportedReason}`);
+                    console.warn(`[generate-docs][warn] 已忽略非规范文档路径：${audience}/${topic}/${lang}/${rel}。${unsupportedReason}`);
                     continue;
                 }
 
                 entries.push({
-                    docsType,
+                    audience,
+                    topic,
                     lang,
                     slug,
                     title: slug.split('/').pop(),
-                    path: `${docsType}/${lang}/${rel}`,
+                    path: path.relative(projectRoot, abs).replace(/\\/g, '/'),
                     updatedAt: null,
                     order: null,
                     groupTitles: {},
@@ -925,7 +965,7 @@ function getUnsupportedMarkdownPathReason(slug) {
         return '顶层只允许 index.md；普通文档应放在一级分组目录下。';
     }
 
-    return '当前目录结构只支持 {avatar|world}/{lang}/index.md、{avatar|world}/{lang}/{group}/index.md 和 {avatar|world}/{lang}/{group}/{page}.md。';
+    return '当前目录结构只支持 content/{audience}/{topic}/{lang}/index.md、content/{audience}/{topic}/{lang}/{group}/index.md 和 content/{audience}/{topic}/{lang}/{group}/{page}.md。';
 }
 
 function warnMissingGroupIndexes(indexEntries) {
@@ -939,7 +979,7 @@ function warnMissingGroupIndexes(indexEntries) {
         }
 
         const [groupName, pageName] = parts;
-        const scopeKey = getDocsScopeKey(entry.docsType, entry.lang);
+        const scopeKey = getDocsScopeKey(entry.audience, entry.topic, entry.lang);
         if (!groupsByScope.has(scopeKey)) {
             groupsByScope.set(scopeKey, new Set());
         }
@@ -954,11 +994,11 @@ function warnMissingGroupIndexes(indexEntries) {
     }
 
     for (const [scopeKey, groupNames] of groupsByScope.entries()) {
-        const [docsType, lang] = scopeKey.split(':');
+        const [audience, topic, lang] = scopeKey.split(':');
         const groupIndexes = groupIndexesByScope.get(scopeKey) || new Set();
         for (const groupName of groupNames) {
             if (!groupIndexes.has(groupName)) {
-                console.warn(`[generate-docs][warn] ${docsType}/${lang}/${groupName}/ 缺少 index.md。分组标题和分组页应由该文件提供。`);
+                console.warn(`[generate-docs][warn] ${audience}/${topic}/${lang}/${groupName}/ 缺少 index.md。分组标题和分组页应由该文件提供。`);
             }
         }
     }
@@ -986,11 +1026,11 @@ function applyGitUpdatedAt(indexEntries, sourceRepoRoot) {
 }
 
 function copyDocsLanguageAssets(docsSources) {
-    for (const {docsType, lang, langRoot: sourceLangRoot} of docsSources) {
+    for (const {audience, topic, lang, langRoot: sourceLangRoot} of docsSources) {
         if (!fs.existsSync(sourceLangRoot)) {
             continue;
         }
-        const targetLangRoot = path.join(outputRoot, docsType, lang);
+        const targetLangRoot = path.join(outputRoot, audience, topic, lang);
         fs.mkdirSync(targetLangRoot, {recursive: true});
 
         const stack = [sourceLangRoot];
@@ -1019,20 +1059,22 @@ function copyDocsLanguageAssets(docsSources) {
 function resolveDocsSources(sourceRepoRoot) {
     const docsSources = [];
 
-    for (const docsType of DOCS_TYPES) {
-        const docsTypeRoot = path.join(sourceRepoRoot, docsType);
-        if (!fs.existsSync(docsTypeRoot)) {
+    for (const collection of DOCS_COLLECTIONS) {
+        const {audience, topic} = collection;
+        const topicRoot = path.join(sourceRepoRoot, audience, topic);
+        if (!fs.existsSync(topicRoot)) {
             continue;
         }
 
-        const langEntries = fs.readdirSync(docsTypeRoot, {withFileTypes: true})
+        const langEntries = fs.readdirSync(topicRoot, {withFileTypes: true})
             .filter((entry) => entry.isDirectory())
             .sort((a, b) => a.name.localeCompare(b.name, 'en'));
         for (const langEntry of langEntries) {
             docsSources.push({
-                docsType,
+                audience,
+                topic,
                 lang: normalizeLang(langEntry.name),
-                langRoot: path.join(docsTypeRoot, langEntry.name)
+                langRoot: path.join(topicRoot, langEntry.name)
             });
         }
     }
@@ -1133,9 +1175,9 @@ function buildDocsTree(docsOfLang) {
     return root;
 }
 
-function getDocsTreeNodeId(docsType, lang, slug, depth) {
+function getDocsTreeNodeId(audience, topic, lang, slug, depth) {
     const normalizedSlug = normalizeDocsSlug(slug) || `group-${depth}`;
-    const safePath = `${docsType}-${lang}-${normalizedSlug}`
+    const safePath = `${audience}-${topic}-${lang}-${normalizedSlug}`
         .replace(/[^a-z0-9_-]+/gi, '-')
         .replace(/^-+|-+$/g, '');
     return `docs-tree-${safePath || depth}`;
@@ -1170,7 +1212,7 @@ function renderDocsTreeToggle({groupLabel, groupChildrenId, expanded = false}) {
     `;
 }
 
-function renderTreeChildren(node, docsType, lang, depth) {
+function renderTreeChildren(node, audience, topic, lang, depth) {
     const entries = Array.from(node.children.entries()).sort((a, b) => {
         const [aName, aNode] = a;
         const [bName, bNode] = b;
@@ -1197,7 +1239,7 @@ function renderTreeChildren(node, docsType, lang, depth) {
         if (child.children.size > 0) {
             const groupLabel = child.groupTitle || name;
             const groupSlug = normalizeDocsSlug(child.indexDoc?.slug || '');
-            const groupChildrenId = getDocsTreeNodeId(docsType, lang, groupSlug || name, depth);
+            const groupChildrenId = getDocsTreeNodeId(audience, topic, lang, groupSlug || name, depth);
             const isTopGroup = depth === 0;
             const groupToggleHtml = renderDocsTreeToggle({
                 groupLabel,
@@ -1206,7 +1248,7 @@ function renderTreeChildren(node, docsType, lang, depth) {
             });
             const groupLabelHtml = child.indexDoc
                 ? renderDocListItem({
-                    href: buildDocsPath({docsType, lang, slug: groupSlug}),
+                    href: buildDocsPath({audience, topic, lang, slug: groupSlug}),
                     slug: groupSlug,
                     title: groupLabel,
                     className: 'docs-tree__group-link'
@@ -1234,7 +1276,7 @@ function renderTreeChildren(node, docsType, lang, depth) {
                         ${groupToggleHtml}
                     </div>
                     <md-list class="docs-tree__children" id="${escapeHtml(groupChildrenId)}" ${isTopGroup ? '' : 'hidden'}>
-                        ${renderTreeChildren(child, docsType, lang, depth + 1)}
+                        ${renderTreeChildren(child, audience, topic, lang, depth + 1)}
                     </md-list>
                 </div>
             `;
@@ -1247,14 +1289,14 @@ function renderTreeChildren(node, docsType, lang, depth) {
         const docSlug = normalizeDocsSlug(doc.slug);
 
         return renderDocListItem({
-            href: buildDocsPath({docsType, lang, slug: docSlug}),
+            href: buildDocsPath({audience, topic, lang, slug: docSlug}),
             slug: docSlug,
             title: doc.title
         });
     }).join('');
 }
 
-function buildDocsTreeHtmlForScope(docsIndex, docsType, lang) {
+function buildDocsTreeHtmlForScope(docsIndex, audience, topic, lang) {
     const treeHeaderHtml = `
         <md-list-item class="docs-tree__item docs-tree__main-link" type="link" href="${escapeHtml(VRCLEARN_MAIN_SITE.homepageUrl)}" data-main-site-link="1" aria-label="返回 ${escapeHtml(VRCLEARN_MAIN_SITE.name)} 主站">
             <md-icon slot="start" aria-hidden="true">arrow_back</md-icon>
@@ -1263,7 +1305,7 @@ function buildDocsTreeHtmlForScope(docsIndex, docsType, lang) {
         <div class="docs-tree__header">文档目录</div>
     `;
     const docsHomeHtml = `
-        <md-list-item class="docs-tree__item docs-tree__home" type="link" href="${buildDocsPath({docsType, lang, slug: ''})}" data-doc-home-link="1">
+        <md-list-item class="docs-tree__item docs-tree__home" type="link" href="${buildDocsPath({audience, topic, lang, slug: ''})}" data-doc-home-link="1">
             <md-icon slot="start" aria-hidden="true">article</md-icon>
             <span slot="headline">文档首页</span>
         </md-list-item>
@@ -1276,7 +1318,8 @@ function buildDocsTreeHtmlForScope(docsIndex, docsType, lang) {
         </md-list-item>
     `;
 
-    const docsOfScope = docsIndex.filter((item) => item.docsType === docsType
+    const docsOfScope = docsIndex.filter((item) => item.audience === audience
+        && item.topic === topic
         && normalizeLang(item.lang) === lang
         && normalizeDocsSlug(item.slug) !== '');
     if (docsOfScope.length === 0) {
@@ -1293,7 +1336,7 @@ function buildDocsTreeHtmlForScope(docsIndex, docsType, lang) {
         ${listOpen}
         ${treeHeaderHtml}
         ${docsHomeHtml}
-        ${renderTreeChildren(tree, docsType, lang, 0)}
+        ${renderTreeChildren(tree, audience, topic, lang, 0)}
         ${listClose}
     `;
 }
@@ -1310,8 +1353,9 @@ function buildDocsPages(indexEntries, sourceRepoRoot) {
         const markdownText = fs.readFileSync(absoluteDocPath, 'utf8');
         const rendered = renderMarkdownPage(markdownText, entry);
         const normalizedSlug = normalizeDocsSlug(entry.slug);
-        pagesByKey[`${entry.docsType}:${normalizeLang(entry.lang)}:${normalizedSlug}`] = {
-            docsType: entry.docsType,
+        pagesByKey[`${entry.audience}:${entry.topic}:${normalizeLang(entry.lang)}:${normalizedSlug}`] = {
+            audience: entry.audience,
+            topic: entry.topic,
             lang: normalizeLang(entry.lang),
             slug: normalizedSlug,
             title: rendered.title || entry.title,
@@ -1332,9 +1376,9 @@ function writeGeneratedDocsData(indexEntries, sourceRepoRoot, docsSources) {
     ensureGeneratedDataDir();
 
     const docsTreeHtmlByScope = {};
-    for (const {docsType, lang} of docsSources) {
-        const scopeKey = getDocsScopeKey(docsType, lang);
-        docsTreeHtmlByScope[scopeKey] = buildDocsTreeHtmlForScope(indexEntries, docsType, lang);
+    for (const {audience, topic, lang} of docsSources) {
+        const scopeKey = getDocsScopeKey(audience, topic, lang);
+        docsTreeHtmlByScope[scopeKey] = buildDocsTreeHtmlForScope(indexEntries, audience, topic, lang);
     }
 
     const docsPagesByKey = sourceRepoRoot ? buildDocsPages(indexEntries, sourceRepoRoot) : {};
@@ -1343,9 +1387,9 @@ function writeGeneratedDocsData(indexEntries, sourceRepoRoot, docsSources) {
 }
 
 function generateFromLocalRepo() {
-    const docsSources = resolveDocsSources(projectRoot);
+    const docsSources = resolveDocsSources(docsSourceRoot);
     if (docsSources.length === 0) {
-        throw new Error(`文档目录不存在或不含语言目录。应至少提供 ${DOCS_TYPES.map((docsType) => `${docsType}/{lang}`).join(' 或 ')}。`);
+        throw new Error('文档目录不存在或不含语言目录。应至少提供 content/{audience}/{topic}/{lang}。');
     }
     ensureCleanOutput();
     copyDocsLanguageAssets(docsSources);

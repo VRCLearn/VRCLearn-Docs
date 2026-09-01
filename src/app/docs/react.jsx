@@ -1,7 +1,14 @@
 import {useEffect, useRef} from 'react';
 import {docsPagesByKey, docsTreeHtmlByScope} from '../../generated/docs-data.js';
 import {getPreferredLang} from '../i18n/language.js';
-import {DEFAULT_DOCS_TYPE, normalizeDocsSlug, normalizeDocsType} from '../shell/routes.js';
+import {
+    DEFAULT_DOCS_AUDIENCE,
+    DEFAULT_DOCS_TOPIC,
+    DOCS_COLLECTIONS,
+    normalizeDocsAudience,
+    normalizeDocsSlug,
+    normalizeDocsTopic
+} from '../shell/routes.js';
 import {HtmlContent} from '../utils/html-react.jsx';
 import siteConfig from '../../../site.config.json';
 
@@ -9,6 +16,15 @@ const VRCLEARN_MAIN_SITE = siteConfig.sites.www;
 
 function normalizeLang(lang) {
     return String(lang || 'zh-cn').trim().toLowerCase() || 'zh-cn';
+}
+
+function normalizeScope(audience, topic) {
+    const normalizedAudience = normalizeDocsAudience(audience);
+    const normalizedTopic = normalizeDocsTopic(topic, normalizedAudience);
+    if (!normalizedAudience || !normalizedTopic) {
+        return {audience: DEFAULT_DOCS_AUDIENCE, topic: DEFAULT_DOCS_TOPIC};
+    }
+    return {audience: normalizedAudience, topic: normalizedTopic};
 }
 
 function getFallbackDocsTreeHtml() {
@@ -26,15 +42,15 @@ function getFallbackDocsTreeHtml() {
     `;
 }
 
-export function getDocsTreeHtml(docsType, lang) {
-    const normalizedDocsType = normalizeDocsType(docsType) || DEFAULT_DOCS_TYPE;
+export function getDocsTreeHtml(audience, topic, lang) {
+    const scope = normalizeScope(audience, topic);
     const normalizedLang = normalizeLang(lang);
-    return docsTreeHtmlByScope[`${normalizedDocsType}:${normalizedLang}`] || getFallbackDocsTreeHtml();
+    return docsTreeHtmlByScope[`${scope.audience}:${scope.topic}:${normalizedLang}`] || getFallbackDocsTreeHtml();
 }
 
-export function getGeneratedDocPage(docsType, lang, slug) {
-    const normalizedDocsType = normalizeDocsType(docsType) || DEFAULT_DOCS_TYPE;
-    const key = `${normalizedDocsType}:${normalizeLang(lang)}:${normalizeDocsSlug(slug)}`;
+export function getGeneratedDocPage(audience, topic, lang, slug) {
+    const scope = normalizeScope(audience, topic);
+    const key = `${scope.audience}:${scope.topic}:${normalizeLang(lang)}:${normalizeDocsSlug(slug)}`;
     return docsPagesByKey[key] || null;
 }
 
@@ -85,11 +101,11 @@ export function toggleDocsGroup(toggle) {
     setDocsGroupExpanded(group, toggle.getAttribute('aria-expanded') !== 'true');
 }
 
-export function DocsSidebar({docsType, lang, currentSlug}) {
+export function DocsSidebar({audience, topic, lang, currentSlug}) {
     const sidebarRef = useRef(null);
-    const normalizedDocsType = normalizeDocsType(docsType) || DEFAULT_DOCS_TYPE;
+    const scope = normalizeScope(audience, topic);
     const normalizedLang = normalizeLang(lang);
-    const treeHtml = getDocsTreeHtml(normalizedDocsType, normalizedLang);
+    const treeHtml = getDocsTreeHtml(scope.audience, scope.topic, normalizedLang);
 
     useEffect(() => {
         const sidebar = sidebarRef.current;
@@ -108,7 +124,7 @@ export function DocsSidebar({docsType, lang, currentSlug}) {
                 item.removeAttribute('aria-current');
             }
         });
-    }, [currentSlug, normalizedDocsType, normalizedLang, treeHtml]);
+    }, [currentSlug, normalizedLang, scope.audience, scope.topic, treeHtml]);
 
     return (
         <div
@@ -127,37 +143,31 @@ export function DocsEntry() {
     return (
         <>
             <h1 className="page-title">教程文档</h1>
-            <p className="page-body">这里是教程文档入口。你可以直接从下方进入并选择需要的内容进行阅读。</p>
+            <p className="page-body">请先选择身份和主题，再进入对应的文档集。</p>
             <div className="card">
                 <h2 className="card__title">进入文档</h2>
-                <p>选择要阅读的文档类型，进入对应的文档首页。</p>
                 <div className="card__actions">
-                    <md-filled-tonal-button
-                        type="link"
-                        href={`/${DEFAULT_DOCS_TYPE}/${preferredLang}`}
-                        data-docs-home-by-cookie="1"
-                        data-docs-type={DEFAULT_DOCS_TYPE}
-                        data-fallback-lang={preferredLang}
-                    >
-                        Avatar 文档
-                    </md-filled-tonal-button>
-                    <md-filled-tonal-button
-                        type="link"
-                        href={`/world/${preferredLang}`}
-                        data-docs-home-by-cookie="1"
-                        data-docs-type="world"
-                        data-fallback-lang={preferredLang}
-                    >
-                        World 文档
-                    </md-filled-tonal-button>
+                    {DOCS_COLLECTIONS.map((collection) => (
+                        <md-filled-tonal-button
+                            key={`${collection.audience}:${collection.topic}`}
+                            type="link"
+                            href={`/${preferredLang}/${collection.audience}/${collection.topic}`}
+                            data-docs-home-by-cookie="1"
+                            data-docs-audience={collection.audience}
+                            data-docs-topic={collection.topic}
+                            data-fallback-lang={preferredLang}
+                        >
+                            {collection.name}
+                        </md-filled-tonal-button>
+                    ))}
                 </div>
             </div>
         </>
     );
 }
 
-export function DocsHome({docsType, lang}) {
-    const page = getGeneratedDocPage(docsType, lang, '');
+export function DocsHome({audience, topic, lang}) {
+    const page = getGeneratedDocPage(audience, topic, lang, '');
 
     return (
         <>
@@ -171,9 +181,9 @@ export function DocsHome({docsType, lang}) {
     );
 }
 
-export function DocsDetail({docsType, lang, slug}) {
+export function DocsDetail({audience, topic, lang, slug}) {
     const normalizedSlug = normalizeDocsSlug(slug);
-    const page = normalizedSlug ? getGeneratedDocPage(docsType, lang, normalizedSlug) : null;
+    const page = normalizedSlug ? getGeneratedDocPage(audience, topic, lang, normalizedSlug) : null;
 
     if (!normalizedSlug) {
         return (

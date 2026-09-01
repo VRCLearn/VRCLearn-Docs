@@ -127,10 +127,10 @@ function RouteContent({route}) {
         );
     }
     if (route.type === 'docs-home') {
-        return <DocsHome docsType={route.docsType} lang={route.lang} />;
+        return <DocsHome audience={route.audience} topic={route.topic} lang={route.lang} />;
     }
     if (route.type === 'docs-detail') {
-        return <DocsDetail docsType={route.docsType} lang={route.lang} slug={route.slug} />;
+        return <DocsDetail audience={route.audience} topic={route.topic} lang={route.lang} slug={route.slug} />;
     }
     return <DocsEntry />;
 }
@@ -305,9 +305,10 @@ export default function App() {
 
         if (target.matches('[data-docs-home-by-cookie="1"]')) {
             event.preventDefault();
-            const docsType = target.getAttribute('data-docs-type') || 'avatar';
+            const audience = target.getAttribute('data-docs-audience') || siteConfig.docs.defaultAudience;
+            const topic = target.getAttribute('data-docs-topic') || siteConfig.docs.defaultTopic;
             const fallbackLang = target.getAttribute('data-fallback-lang') || route.lang;
-            await navigateTo({docsType, lang: getPreferredLang() || fallbackLang, type: 'docs-home'});
+            await navigateTo({audience, topic, lang: getPreferredLang() || fallbackLang, type: 'docs-home'});
             return;
         }
 
@@ -365,7 +366,8 @@ export default function App() {
                     ref={appNavRef}
                 >
                     <DocsSidebar
-                        docsType={route.docsType}
+                        audience={route.audience}
+                        topic={route.topic}
                         lang={route.lang}
                         currentSlug={route.type === 'docs-detail' ? route.slug : null}
                     />

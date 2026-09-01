@@ -6,7 +6,7 @@
 
 本仓库同时保存 Markdown 文档和文档站源码，并独立部署到 <https://docs.vrclearn.com>。
 
-- 文档源文件位于仓库根目录的 `avatar/` 与 `world/`。
+- 文档源文件位于 `content/`，按受众、主题和语言分层。
 - 文档站源码位于 `src/`、`public/` 与 `scripts/`。
 - `npm run dev` 和 `npm run build` 会直接读取本仓库文档，不会克隆远程仓库。
 - `VRCLearn-Website` 只负责 <https://www.vrclearn.com> 主站，不编译文档。
@@ -16,39 +16,46 @@
 文档按“文档类型 -> 语言 -> 一级分组 -> 页面”组织：
 
 ```text
-avatar/
-    zh-cn/
-        index.md
-        start/
-            index.md
-            introduction.md
-            install-unity.md
-        basics/
-            index.md
-            unity-basics.md
-world/
-    zh-cn/
-        index.md
+content/
+    creator/
+        avatar/
+            zh-cn/
+                index.md
+                start/
+                    index.md
+                    introduction.md
+                    install-unity.md
+                basics/
+                    index.md
+                    unity-basics.md
+        world/
+            zh-cn/
+                index.md
+    player/
+        vrchat/
+            zh-cn/
+                index.md
 ```
 
-当前支持的文档类型只有 `avatar` 和 `world`。语言目录建议使用全小写语言标签，例如 `zh-cn`、`en-us`。
+当前声明的文档集为 `creator/avatar`、`creator/world` 和 `player/vrchat`。语言目录建议使用全小写语言标签，例如 `zh-cn`、`en-us`。
 
 支持的 Markdown 路径层级：
 
-- `{avatar|world}/{lang}/index.md`：该类型和语言的文档首页。
-- `{avatar|world}/{lang}/{group}/index.md`：一级分组首页。
-- `{avatar|world}/{lang}/{group}/{page}.md`：一级分组内的普通文档。
+- `content/{audience}/{topic}/{lang}/index.md`：该文档集和语言的首页。
+- `content/{audience}/{topic}/{lang}/{group}/index.md`：一级分组首页。
+- `content/{audience}/{topic}/{lang}/{group}/{page}.md`：一级分组内的普通文档。
 
 语言根目录除 `index.md` 外不应放普通文档，也不支持更深的文档分组。生成脚本会忽略不符合上述结构的 Markdown 并输出警告。
 
 ## 3. 路由映射
 
-- `avatar/zh-cn/index.md` -> `/avatar/zh-cn`
-- `avatar/zh-cn/start/index.md` -> `/avatar/zh-cn/start`
-- `avatar/zh-cn/start/install-unity.md` -> `/avatar/zh-cn/start/install-unity`
-- `world/zh-cn/index.md` -> `/world/zh-cn`
+- `content/creator/avatar/zh-cn/index.md` -> `/zh-cn/creator/avatar`
+- `content/creator/avatar/zh-cn/start/index.md` -> `/zh-cn/creator/avatar/start`
+- `content/creator/avatar/zh-cn/start/install-unity.md` -> `/zh-cn/creator/avatar/start/install-unity`
+- `content/creator/world/zh-cn/index.md` -> `/zh-cn/creator/world`
+- `content/player/vrchat/zh-cn/index.md` -> `/zh-cn/player/vrchat`
 
-文档站根路径 `/` 是文档类型入口，发布 `/avatar/{lang}`、`/avatar/{lang}/{slug}`、`/world/{lang}` 与 `/world/{lang}/{slug}` 路由。
+文档站根路径 `/` 是文档集入口，发布 `/{lang}/{audience}/{topic}` 与 `/{lang}/{audience}/{topic}/{slug}` 路由。旧版 `/avatar/{lang}` 与 `/world/{lang}` 路由不保留且不重定向。
 
 ## 4. 构建生成流程
 
@@ -60,8 +67,8 @@ node scripts/generate-docs.mjs
 
 脚本会：
 
-1. 扫描 `avatar/{lang}/` 与 `world/{lang}/`。
-2. 复制文档和同目录资源到 `public/docs-content/{type}/{lang}/`。
+1. 根据 `site.config.json` 中的 `docs.collections` 扫描 `content/{audience}/{topic}/{lang}/`。
+2. 复制文档和同目录资源到 `public/docs-content/{audience}/{topic}/{lang}/`。
 3. 读取 Markdown 标题和目录排序信息。
 4. 生成 `public/docs-content/index.json`。
 5. 生成供 React 使用的 `src/generated/docs-data.js`。
@@ -84,7 +91,7 @@ node scripts/generate-docs.mjs
 
 ### 5.2 分组标题
 
-一级分组名称来自该分组 `index.md` 的 H1。例如 `avatar/zh-cn/start/index.md` 的 H1 为 `# 开始`，侧边栏就显示“开始”。缺少分组首页或 H1 时会回退到目录名，并在适用时输出构建警告。
+一级分组名称来自该分组 `index.md` 的 H1。例如 `content/creator/avatar/zh-cn/start/index.md` 的 H1 为 `# 开始`，侧边栏就显示“开始”。缺少分组首页或 H1 时会回退到目录名，并在适用时输出构建警告。
 
 ## 6. 排序规则
 
@@ -133,14 +140,14 @@ node scripts/generate-docs.mjs
 ```md
 [安装 Unity](./install-unity.md)
 [返回分组首页](./index.md)
-[Avatar 中文首页](/avatar/zh-cn/index.md)
+[Avatar 中文首页](/zh-cn/creator/avatar/index.md)
 ```
 
 生成后分别归一化为：
 
 - `./install-unity.md` -> 当前分组的 `/install-unity` 页面。
 - `./index.md` -> 当前分组首页。
-- `/avatar/zh-cn/index.md` -> `/avatar/zh-cn`。
+- `/zh-cn/creator/avatar/index.md` -> `/zh-cn/creator/avatar`。
 
 锚点链接会保留。外部链接使用完整 `https://...` 地址。
 
@@ -156,7 +163,7 @@ node scripts/generate-docs.mjs
 构建时资源会复制到：
 
 ```text
-/docs-content/{type}/{lang}/...
+/docs-content/{audience}/{topic}/{lang}/...
 ```
 
 相对图片和非 Markdown 附件链接会自动改写到该公开资源路径。不要依赖语言目录之外的本地文件。
@@ -188,7 +195,7 @@ node scripts/generate-docs.mjs
 ```md
 :::actions
 
-- [Avatar 文档](/avatar/zh-cn)
+- [Avatar 文档](/zh-cn/creator/avatar)
 - [返回主站](https://www.vrclearn.com/)
 :::
 ```
@@ -197,7 +204,7 @@ node scripts/generate-docs.mjs
 
 ## 11. 推荐维护流程
 
-1. 在 `avatar/{lang}/` 或 `world/{lang}/` 的受支持层级中新增或修改文档。
+1. 在 `content/{audience}/{topic}/{lang}/` 的受支持层级中新增或修改文档。
 2. 为每篇文档写唯一、清晰的首个 H1。
 3. 为每个一级分组维护 `index.md`，并用 H2 链接排列组内文档。
 4. 在语言根 `index.md` 中编写首页内容，并用 H2 链接排列一级分组。

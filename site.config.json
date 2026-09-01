@@ -9,6 +9,27 @@
         "description": "VRCLearn 文档中心，包含 Avatar、World 教程与 ALCOMD 文档。",
         "socialDescription": "汇集 VRChat Avatar、World 与 ALCOMD 的文档。"
     },
+    "docs": {
+        "defaultAudience": "creator",
+        "defaultTopic": "avatar",
+        "collections": [
+            {
+                "audience": "creator",
+                "topic": "avatar",
+                "name": "Avatar 创作"
+            },
+            {
+                "audience": "creator",
+                "topic": "world",
+                "name": "World 创作"
+            },
+            {
+                "audience": "player",
+                "topic": "vrchat",
+                "name": "玩家指南"
+            }
+        ]
+    },
     "sites": {
         "www": {
             "name": "VRCLearn",

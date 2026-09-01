@@ -48,10 +48,12 @@ function normalizeLang(rawLang) {
 }
 
 function buildDocsPath(entry) {
-    const docsType = entry.docsType === 'world' ? 'world' : 'avatar';
+    const audience = String(entry.audience || '').trim().toLowerCase();
+    const topic = String(entry.topic || '').trim().toLowerCase();
     const lang = normalizeLang(entry.lang);
     const slug = normalizeDocsSlug(entry.slug);
-    return slug ? `/${docsType}/${lang}/${encodeURI(slug)}` : `/${docsType}/${lang}`;
+    const docsHomePath = `/${lang}/${audience}/${topic}`;
+    return slug ? `${docsHomePath}/${encodeURI(slug)}` : docsHomePath;
 }
 
 function escapeXml(value) {
@@ -105,10 +107,11 @@ function collectSitemapEntries(siteUrl) {
     const docsHomeScopes = new Map();
 
     for (const doc of docsIndex) {
-        const docsType = doc.docsType === 'world' ? 'world' : 'avatar';
+        const audience = String(doc.audience || '').trim().toLowerCase();
+        const topic = String(doc.topic || '').trim().toLowerCase();
         const lang = normalizeLang(doc.lang);
         const lastmod = normalizeDate(doc.updatedAt);
-        const scopeKey = `${docsType}:${lang}`;
+        const scopeKey = `${audience}:${topic}:${lang}`;
         docsHomeScopes.set(scopeKey, getLatestDate(docsHomeScopes.get(scopeKey), lastmod));
 
         const pathname = buildDocsPath(doc);
@@ -116,8 +119,8 @@ function collectSitemapEntries(siteUrl) {
     }
 
     for (const [scopeKey, lastmod] of docsHomeScopes.entries()) {
-        const [docsType, lang] = scopeKey.split(':');
-        const pathname = `/${docsType}/${lang}`;
+        const [audience, topic, lang] = scopeKey.split(':');
+        const pathname = `/${lang}/${audience}/${topic}`;
         if (!entriesByPath.has(pathname)) {
             entriesByPath.set(pathname, {loc: `${siteUrl}${pathname}`, lastmod});
         }

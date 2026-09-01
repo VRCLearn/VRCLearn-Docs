@@ -11,7 +11,7 @@
 
 ## 仓库边界
 
-- `avatar/` 与 `world/` 保存文档源文件。
+- `content/{audience}/{topic}/{lang}/` 保存文档源文件，受众、主题和可用文档集由 `site.config.json` 统一声明。
 - `src/`、`public/` 与 `scripts/` 保存文档站实现。
 - 文档站构建必须直接读取本仓库文档，不得从远程仓库再次克隆自身。
 - VRCLearn 是包含主站与 ALCOMD 等项目的整体；本仓库的文档站不是 `www.vrclearn.com` 的专属文档站。
